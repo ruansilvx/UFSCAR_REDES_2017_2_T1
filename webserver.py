@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import cgitb, cgi
 import socket
 import struct
@@ -89,8 +91,18 @@ def empacotar(comando, end_local, end_dest):
 # Recupera a resposta do pacote vindo do daemon
 def desempacotar(pacote): 
     t_length = int(pacote[16:32], 2)
+    checksum = pacote
     options = list(pacote[160:t_length+1].zfill(32))
     return "".join(chr(int("".join(map(str, options[i:i+8])),2)) for i in range(0,len(options),8)).lstrip('\x00')
+
+# Checa o campo checksum por possíveis inversões de bit
+def checksum_valido(pacote):
+    cksum_p = pacote[80:96]
+    pac_teste = pacote[:79] + '0000000000000000' + pacote[97:]
+    cksum_t = crc16(pac_teste.encode())
+    if cksum_p == cksum_t:
+        return True
+    return False
   
 # Envia os comandos para os daemons por meio de sockets
 def enviar_comando(comando):
@@ -98,10 +110,20 @@ def enviar_comando(comando):
     ip = socket.gethostbyname(socket.gethostname())
     pacote = empacotar(comando, ip, sock.getsockname()[0])
     sock.send(pacote)
-    pacote_resp = sock.recv(1024)
-    resposta = desempacotar(pacote_resp)
+    reposta = ''
+    while 1:
+        pacote_resp = sock.recv(1024)
+        if not pacote_resp:
+            break
+        else:
+            if checksum_valido(pacote_resp):
+                resposta += desempacotar(pacote_resp)
+            else:
+                return 'erro_checksum'
+            
     return resposta
-    
+
+
 
 # Processa os comandos coletados e cria um dicionario com as 
 # respostas de cada um
@@ -110,4 +132,13 @@ for maq, coms in comandos.items():
     respostas[maq] = {}
     for com in coms:
         respostas[maq][com[0]] = enviar_comando(com)
+        if respostas[maq][com[0]] == 'erro_checksum':
+            for i in range(3):
+                respostas[maq][com[0]] = enviar_comando(com)
+                if respostas[maq][com[0]] != 'erro_checksum':
+                   break;   
 
+
+# Fim backend
+
+# Apresentacao dos resultados
