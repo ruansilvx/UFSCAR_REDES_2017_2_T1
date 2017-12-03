@@ -1,6 +1,5 @@
 import subprocess # https://docs.python.org/3/library/subprocess.html
 import socket # https://docs.python.org/3/library/socket.html
-from socket import socket as sock
 import threading
 
 import webserver
@@ -10,7 +9,7 @@ invalidos = "|;>" #Parametros considerados maliciosos
 # Funcao para executar o comando
 #   cmd = Comando a ser executado
 #   arg = Argumentos desse comando
-def Executar(cmd, arg):
+def Executa(cmd, arg):
     
     # Tratamento de parametros maliciosos
     parInvalidos = []
@@ -35,10 +34,17 @@ def Executar(cmd, arg):
     except subprocess.CalledProcessError:
         return "Comando invalido."
     
-def Empacotar():
-    return False
+def Converte(s):
+    comandos = {'00000001':'ps', '00000010':'df', '00000011':'finger', '00000100':'uptime'}
+    if s in comandos:
+        return comandos[s]
+    return None
 
-def Desempacotar():
+# Desempacota um pacote e retorna os campos utilizados pelo Daemon para executar o comando
+def Desempacota(pacote):
+    if len(pacote) < 160:
+        return None
+    
     version = pacote[:4]
     ihl = pacote[4:8]
     type_serv = pacote[8:16]
@@ -49,12 +55,50 @@ def Desempacotar():
     ttl = pacote[64:72]
     protocol = pacote[72:80]
     checksum = pacote[80:96]
+    
+    # Verificacao do checksum, ignorando o campo checksum
+    if checksum != webserver.crc16(pacote[:80] + '0000000000000000' + pacote[96:]):
+        return None
+    
     source_addr = pacote[96:128]
+    source = socket.inet_aton(struct.pack('!I', int(source_addr.lstrip('0'), 2)))
+    
     dest_addr = pacote[128:160]
+    dest = socket.inet_aton(struct.pack('!I', int(dest_addr.lstrip('0'), 2)))
+    
     options[160:-1]
     
-    return dest_addr, source_addr, protocol, options
+    cmd = Converte(protocol)
+    arg = "".join(chr(int("".join(map(str, options[i:i+8])),2)) for i in range(0,len(options),8))
+    
+    return dest, source, cmd, arg, ttl
 
+# Cria um pacote a partir dos parametros e o retorna
+def Empacota(cmd, arg, _dest_addr, _source_sddr, _ttl):
+    version = '0010'
+    ihl = '0101'
+    type_serv = '00000000' 
+    ident = '0000000000000001'
+    flags = '111'
+    frag_off = '0000000000000'
+    ttl = bin(int(ttl, 2) - 1).replace("0b","")
+    checksum = '0000000000000000' 
+    protocol = webserver.comparabinario(comando[0])
+    options  = ''.join('{0:08b}'.format(ord(x), 'b') for x in arg)[2:]
+    
+    source_addr = bin(struct.unpack('!I', socket.inet_aton(_source_addr))[0])[2:].zfill(32)
+    dest_addr = bin(struct.unpack('!I', socket.inet_aton(_dest_addr))[0])[2:].zfill(32)
+    
+    t_length = bin((32 * 5) + len(options))[2:].zfill(16)
+    
+    pacote = ''.join( [version + ihl + type_serv + t_length + ident + flags + frag_off + ttl + protocol + checksum + source_addr + dest_addr + options])
+      
+    checksum = webserver.crc16(pacote.encode())
+
+    pacote = ''.join( [version + ihl + type_serv + t_length + ident + flags + frag_off + ttl + protocol + checksum + source_addr + dest_addr + options])
+    
+    return pacote    
+    
 # Classe para o servidor multithread
 #   Referencia: goo.gl/cG7RuJ
 class Servidor(object):
@@ -63,7 +107,7 @@ class Servidor(object):
         self.port = _port
         
         # Documentacao: https://goo.gl/T1rchX
-        self.socket = sock(socket.AF_INET, socket.SOCK_STREAM) # Criacao de um novo socket
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Criacao de um novo socket
         
         self.socket.bind((host, port)) # Criacao de uma ligacao entre o socket e o endereco host:port
         self.socket.setdefaulttimeout(10) # Se uma instrucao nao terminar em 5 segundos, ela vai falhar
@@ -88,15 +132,14 @@ class Servidor(object):
                 pacote = conn.recv(1024) # O tamanho do buffer deve ser, preferencialmente, uma potencia de 2
                 if pacote:
                     try:
-                        lista = []
-                        lista = Desempacotar(pacote)
+                        dest_addr, source_addr, cmd, arg, ttl = Desempacota(pacote)
                     except ValueError:
                         print("Pacote corrompido ou fora dos padroes.")
                         conn.close()
                         return False
                     
-                    resp = Executar(lista[0], lista[1])
-                    pacote2 = Empacotar(lista[0], lista[2], lista[3], lista[4])
+                    resp = Executa(cmd, arg)
+                    pacote2 = webserver.empacotar(lista[0], lista[2], lista[3], lista[4])
                     
                     try:                    
                         conn.send(pacote2)
