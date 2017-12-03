@@ -58,6 +58,7 @@ def Desempacota(pacote):
     
     # Verificacao do checksum, ignorando o campo checksum
     if checksum != webserver.crc16(pacote[:80] + '0000000000000000' + pacote[96:]):
+        print("Checksum incorreto")
         return None
     
     source_addr = pacote[96:128]
@@ -139,7 +140,7 @@ class Servidor(object):
                         return False
                     
                     resp = Executa(cmd, arg)
-                    pacote2 = webserver.empacotar(lista[0], lista[2], lista[3], lista[4])
+                    pacote2 = Empacota(cmd, arg, source_addr, dest_addr, ttl)
                     
                     try:                    
                         conn.send(pacote2)
@@ -147,6 +148,6 @@ class Servidor(object):
                         print("Nao foi possivel enviar a resposta")
                         
             except:
-                print("Nao foi possivel receber informacoes dessa conexao")
+                print("Fim da conexao")
                 conn.close()
                 return False
