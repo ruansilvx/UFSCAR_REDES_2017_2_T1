@@ -124,9 +124,9 @@ def enviar_comando(comando):
             
     return resposta
 
-daemon.Daemon('localhost',8001).listen()
-daemon.Daemon('localhost',8002).listen()
-daemon.Daemon('localhost',8003).listen()
+daemon.Daemon('localhost',8011).listen()
+daemon.Daemon('localhost',8012).listen()
+daemon.Daemon('localhost',8013).listen()
 
 # Processa os comandos coletados e cria um dicionario com as 
 # respostas de cada um

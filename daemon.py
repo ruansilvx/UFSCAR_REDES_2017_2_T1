@@ -43,9 +43,9 @@ def Executa(cmd, arg):
         if c in invalidos:
             parInvalidos.append(c)
     if len(parInvalidos) == 1:
-        return "Parametro " + str(parInvalidos[0]) + "malicioso! O comando não sera executado."
+        return "Parametro " + str(parInvalidos[0]) + "malicioso! O comando nao sera executado."
     elif len(parInvalidos) > 1:
-        return "Parametros " + ", ".join(parInvalidos) + " maliciosos! O comando não sera executado."
+        return "Parametros " + ", ".join(parInvalidos) + " maliciosos! O comando nao sera executado."
     
     # Execucao do comando
     try:
@@ -140,7 +140,7 @@ class Daemon(object):
         socket.setdefaulttimeout(10) # Se uma instrucao nao terminar em 5 segundos, ela vai falhar
         
     def listen(self):
-        self.socket.listen(3) # Teremos no máximo 3 daemons rodando
+        self.socket.listen(3) # Teremos no maximo 3 daemons rodando
         
         while True:
             try:
