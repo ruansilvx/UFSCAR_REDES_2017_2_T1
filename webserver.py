@@ -140,5 +140,5 @@ for maq, coms in comandos.items():
 
 
 # Fim backend
-
+print(respostas)
 # Apresentacao dos resultados

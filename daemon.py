@@ -2,14 +2,40 @@ import subprocess # https://docs.python.org/3/library/subprocess.html
 import socket # https://docs.python.org/3/library/socket.html
 import threading
 
-import webserver
+# Retirado de: https://gist.github.com/oysstu/68072c44c02879a2abf94ef350d1c7c6
+def crc16(data):
+    data = bytearray(data)
+    poly = 0x8408
+    crc = 0xFFFF
+    for b in data:
+        cur_byte = 0xFF & b
+        for _ in range(0, 8):
+            if (crc & 0x0001) ^ (cur_byte & 0x0001):
+                crc = (crc >> 1) ^ poly
+            else:
+                crc >>= 1
 
-invalidos = "|;>" #Parametros considerados maliciosos
+            cur_byte >>= 1
+
+    crc = (~crc & 0xFFFF)
+    crc = (crc << 8) | ((crc >> 8) & 0xFF)
+    crc = 0x0000FFFF & crc
+    return bin(crc)[2:].zfill(16)
+
+def comparabinario(com):
+    comandos = {
+                 'ps': '00000001',
+                 'df': '00000010',
+                 'finger': '00000011',
+                 'uptime': '00000100'
+               }
+    return comandos[com]
 
 # Funcao para executar o comando
 #   cmd = Comando a ser executado
 #   arg = Argumentos desse comando
 def Executa(cmd, arg):
+    invalidos = "|;>" #Parametros considerados maliciosos
     
     # Tratamento de parametros maliciosos
     parInvalidos = []
@@ -57,7 +83,7 @@ def Desempacota(pacote):
     checksum = pacote[80:96]
     
     # Verificacao do checksum, ignorando o campo checksum
-    if checksum != webserver.crc16(pacote[:80] + '0000000000000000' + pacote[96:]):
+    if checksum != crc16(pacote[:80] + '0000000000000000' + pacote[96:]):
         print("Checksum incorreto")
         return None
     
@@ -84,7 +110,7 @@ def Empacota(cmd, arg, _dest_addr, _source_sddr, _ttl):
     frag_off = '0000000000000'
     ttl = bin(int(ttl, 2) - 1).replace("0b","")
     checksum = '0000000000000000' 
-    protocol = webserver.comparabinario(comando[0])
+    protocol = comparabinario(comando[0])
     options  = ''.join('{0:08b}'.format(ord(x), 'b') for x in arg)[2:]
     
     source_addr = bin(struct.unpack('!I', socket.inet_aton(_source_addr))[0])[2:].zfill(32)
@@ -94,7 +120,7 @@ def Empacota(cmd, arg, _dest_addr, _source_sddr, _ttl):
     
     pacote = ''.join( [version + ihl + type_serv + t_length + ident + flags + frag_off + ttl + protocol + checksum + source_addr + dest_addr + options])
       
-    checksum = webserver.crc16(pacote.encode())
+    checksum = crc16(pacote.encode())
 
     pacote = ''.join( [version + ihl + type_serv + t_length + ident + flags + frag_off + ttl + protocol + checksum + source_addr + dest_addr + options])
     
@@ -102,7 +128,7 @@ def Empacota(cmd, arg, _dest_addr, _source_sddr, _ttl):
     
 # Classe para o servidor multithread
 #   Referencia: goo.gl/cG7RuJ
-class Servidor(object):
+class Daemon(object):
     def __init__(self, _host, _port):
         self.host = _host
         self.port = _port
