@@ -4,6 +4,7 @@ import cgitb, cgi
 import socket
 import struct
 import binascii
+import daemon
 
 
 print("Content-Type: text/html;charset=utf-8\n")
@@ -123,7 +124,9 @@ def enviar_comando(comando):
             
     return resposta
 
-
+daemon.Daemon('localhost',8001).listen()
+daemon.Daemon('localhost',8002).listen()
+daemon.Daemon('localhost',8003).listen()
 
 # Processa os comandos coletados e cria um dicionario com as 
 # respostas de cada um
@@ -136,7 +139,7 @@ for maq, coms in comandos.items():
             for i in range(3):
                 respostas[maq][com[0]] = enviar_comando(com)
                 if respostas[maq][com[0]] != 'erro_checksum':
-                   break;   
+                    break
 
 
 # Fim backend

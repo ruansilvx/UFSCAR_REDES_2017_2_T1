@@ -136,8 +136,8 @@ class Daemon(object):
         # Documentacao: https://goo.gl/T1rchX
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Criacao de um novo socket
         
-        self.socket.bind((host, port)) # Criacao de uma ligacao entre o socket e o endereco host:port
-        self.socket.setdefaulttimeout(10) # Se uma instrucao nao terminar em 5 segundos, ela vai falhar
+        self.socket.bind((_host, _port)) # Criacao de uma ligacao entre o socket e o endereco host:port
+        socket.setdefaulttimeout(10) # Se uma instrucao nao terminar em 5 segundos, ela vai falhar
         
     def listen(self):
         self.socket.listen(3) # Teremos no máximo 3 daemons rodando
